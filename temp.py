@@ -25,15 +25,12 @@ ymax = 800
 "yellow" = [255,193,3]
 "light_beige" = [254,175,16]
 """
-xmin = 480
+xmin = 550
 xmax = 1440
 ymin = 300
 ymax = 800
 COLORS = [
-(0,0,0),
-
 (0,80,205),
-(255,255,255),
 (170,170,170),
 (38,201,255),
 (1,116,32),
@@ -51,6 +48,7 @@ COLORS = [
     ]
 COLORS = set(COLORS)
 
+
 from pynput.mouse import Button, Controller
 import multiprocessing
 # import the necessary packages
@@ -64,6 +62,11 @@ import pyautogui
 from math import sqrt
 from functools import lru_cache
 
+pyautogui.PAUSE = 0
+
+
+
+compression = 5
 
 mouse = Controller()
 s = pyautogui.screenshot()
@@ -76,32 +79,31 @@ colorsCoord = dict()
 def clickMouse(x ,y):
     x = x+xmin
     y = y+ymin
-    mouse.position = (x, y)
-    mouse.click(Button.left,1)
+    pyautogui.click(x,y)
+
 
 def clickColor(x,y):
-    mouse.position = (x, y)
-    mouse.click(Button.left,1)
+    pyautogui.click(x,y)
 
 def loadImage():
-    image = Image.open("tortu.png").convert("RGB")
+    image = Image.open("f.jpg").convert("RGB")
     return image
 
 def computeImage(image):
     size = ( ymax-ymin,xmax-xmin)
     size = (500, 500)
     image = image.resize(size)
-    image = image.rotate(90)
     enhancer = ImageEnhance.Contrast(image)
-
+    image = image.rotate(90)
     pixels = np.array(image)
     return pixels
 
 def draw(pixels):
     i, j, osef = pixels.shape
     selectedColor = (1,1,1)
-    for x in range(0,i,2):
-        for y in range(0,j,2):
+    global compression
+    for x in range(0,i,compression):
+        for y in range(0,j,compression):
             actualPixel = tuple(pixels[x,y])
             if(actualPixel != (0,0,0)):
                 if(actualPixel != selectedColor):
@@ -132,28 +134,55 @@ def giveClosestColor(rgb):
 
     return min(color_diffs)[1]
 
-def updateColors(pixels):
+def updateColors(pixels, index, return_array):
     i, j, osef = pixels.shape
     for x in range(i):
         for y in range(j):
             pixels[x,y] = giveClosestColor(tuple(pixels[x,y]))
-    return pixels
+
+    return_array[index] = pixels
+
+
+newArray = dict()
+
+def multiProcess(pixels):
+    coresCount = multiprocessing.cpu_count()
+    manager = multiprocessing.Manager()
+    return_dict = manager.dict()
+    temp = np.split(pixels,coresCount)
+   
+    processes = []
+    for i in range(coresCount):
+        array = temp[i]
+        p = multiprocessing.Process(target=updateColors, args=(array, i, return_dict))
+        processes.append(p)
+        p.start()
+    
+    for process in processes:
+        process.join();
+        
+    
+    temp = np.concatenate([v for k,v in sorted(return_dict.items())], 0)
+    return temp
+
 
 if __name__ == '__main__':
     temps = time.time()
     setColorsCoord()
     image = loadImage()
     pixels = computeImage(image)
-    pixels = updateColors(pixels)
+    pixels = multiProcess(pixels)
+    #pixels = updateColors(pixels)
     #Image.fromarray(pixels).show()
     draw(pixels)
+    
     print(time.time()-temps)
     
     '''
     OLD WAY
     
 def color_difference (color1, color2):
-    return sum([abs(component1-component2) for component1, component2 in zip(color1, color2)])
+c    return sum([abs(component1-component2) for component1, component2 in zip(color1, color2)])
 
 
 def giveClosestColor(my_color):
@@ -162,7 +191,7 @@ def giveClosestColor(my_color):
     my_color_name = differences[0][1]
     rgb = TARGET_COLORS[my_color_name]
     return rgb
-
+c
 COLORS = {
    "black" : (0,0,0),
     "dark_grey" : (102,102,102),

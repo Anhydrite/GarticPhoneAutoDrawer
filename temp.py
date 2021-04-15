@@ -45,7 +45,7 @@ COLORS = [
 (176,112,28),
 (153,0,78),
 (203,90,87),
-(205,193,38),
+(255,193,38),
 (255,0,143),
 (254,175,168),
     ]
@@ -71,6 +71,8 @@ s = s.crop((0,0,480,1000))
 size = s.size
 s = s.load()
 
+colorsCoord = dict()
+
 def clickMouse(x ,y):
     x = x+xmin
     y = y+ymin
@@ -82,7 +84,7 @@ def clickColor(x,y):
     mouse.click(Button.left,1)
 
 def loadImage():
-    image = Image.open("tortu.png")
+    image = Image.open("tortu.png").convert("RGB")
     return image
 
 def computeImage(image):
@@ -97,23 +99,27 @@ def computeImage(image):
 
 def draw(pixels):
     i, j, osef = pixels.shape
-    selectedColor = "none"
-    for x in range(0,i,5):
-        for y in range(0,j,5):
-            actualPixel = pixels[x,y]
-            drawColor = giveClosestColor(tuple(actualPixel))
-            if(selectedColor != drawColor):
-                selectColor(drawColor)
-                selectedColor = drawColor
-            clickMouse(x,y)
-    
+    selectedColor = (1,1,1)
+    for x in range(0,i,2):
+        for y in range(0,j,2):
+            actualPixel = tuple(pixels[x,y])
+            if(actualPixel != (0,0,0)):
+                if(actualPixel != selectedColor):
+                    selectColor(actualPixel)
+                    selectedColor = actualPixel
+                clickMouse(x,y)
+        
 def selectColor(color):
-
+    x,y = colorsCoord[color]
+    mouse.position = (x,y)
+    mouse.click(Button.left, 1)
+    
+    
+def setColorsCoord():
     for x in range(size[0]):
         for y in range(size[1]):
-            if (s[x,y] == color):
-                clickColor(x,y)
-                return
+            if (s[x,y] in COLORS):
+                colorsCoord[s[x,y]] = x,y
 
 @lru_cache()
 def giveClosestColor(rgb):
@@ -126,12 +132,22 @@ def giveClosestColor(rgb):
 
     return min(color_diffs)[1]
 
-if __name__ == '__main__':
+def updateColors(pixels):
+    i, j, osef = pixels.shape
+    for x in range(i):
+        for y in range(j):
+            pixels[x,y] = giveClosestColor(tuple(pixels[x,y]))
+    return pixels
 
+if __name__ == '__main__':
+    temps = time.time()
+    setColorsCoord()
     image = loadImage()
     pixels = computeImage(image)
+    pixels = updateColors(pixels)
+    #Image.fromarray(pixels).show()
     draw(pixels)
-
+    print(time.time()-temps)
     
     '''
     OLD WAY

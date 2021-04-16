@@ -27,7 +27,7 @@ ymax = 800
 """
 xmin = 550
 xmax = 1440
-ymin = 300
+ymin = 350
 ymax = 800
 COLORS = [
 (0,80,205),
@@ -55,21 +55,21 @@ import multiprocessing
 import numpy as np
 
 import time
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps
 import numpy as np
 from itertools import chain
 import pyautogui
 from math import sqrt
 from functools import lru_cache
 
-pyautogui.PAUSE = 0.001
+pyautogui.PAUSE = 0.01
 
 
 
-compression = 6
+compression = 2
 
 s = pyautogui.screenshot()
-s = s.crop((0,0,480,1000))
+s = s.crop((0,0,460,700))
 size = s.size
 
 s = s.load()
@@ -79,14 +79,18 @@ colorsCoord = dict()
 def clickMouse(x ,y):
     x = x+xmin
     y = y+ymin
-    pyautogui.click(x,y)
+    pyautogui.click(x,y, 1)
 
+def dragMouse(x,y):
+    x = x+xmin
+    y = y+ymin
+    pyautogui.dragTo(x,y, button='left')
 
 def clickColor(x,y):
     pyautogui.click(x,y)
 
 def loadImage():
-    image = Image.open("assets/f.jpg").convert("RGB")
+    image = Image.open("assets/d.jpg").convert("RGB")
     return image
 
 def computeImage(image):
@@ -94,7 +98,9 @@ def computeImage(image):
     size = (500, 500)
     image = image.resize(size)
     enhancer = ImageEnhance.Contrast(image)
-    image = image.rotate(90)
+    image = image.rotate(270)
+    image = ImageOps.mirror(image)
+
     pixels = np.array(image)
     return pixels
 
@@ -120,7 +126,7 @@ def selectColor(color):
     
 def setColorsCoord():
     for x in range(size[0]):
-        for y in range(150,size[1],1):
+        for y in range(200,size[1],1):
             if (s[x,y] in COLORS):
                 colorsCoord[s[x,y]] = x,y
 
@@ -166,7 +172,26 @@ def multiProcess(pixels):
     temp = np.concatenate([v for k,v in sorted(return_dict.items())], 0)
     return temp
 
+def betterDraw(pixels):
+    i, j, osef = pixels.shape
+    previousColor = (-1, -1, -1)
+    global compression
+    trace = j-(j%compression)
 
+    for x in range(0,i,compression):
+        clickMouse(x,0)
+        for y in range(0,j,compression):
+            actualColor = tuple(pixels[x,y])
+            if(actualColor != previousColor):
+                previousColor = actualColor
+                dragMouse(x,y-1)              
+                selectColor(actualColor)
+                clickMouse(x,y)
+        dragMouse(x,j)
+                
+
+                
+                
 if __name__ == '__main__':
     temps = time.time()
     print("start")
@@ -180,9 +205,10 @@ if __name__ == '__main__':
     print("Palette de l'image modifiée", time.time()-temps)
     #pixels = updateColors(pixels)
     #Image.fromarray(pixels).show()
-    draw(pixels)
+    #draw(pixels)
+    betterDraw(pixels)
     print("Image dessinée", time.time()-temps)
-    
+
     
     '''
     OLD WAY

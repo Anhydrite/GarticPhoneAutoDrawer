@@ -49,7 +49,7 @@ COLORS = [
 COLORS = set(COLORS)
 
 
-from pynput.mouse import Button, Controller
+
 import multiprocessing
 # import the necessary packages
 import numpy as np
@@ -62,16 +62,16 @@ import pyautogui
 from math import sqrt
 from functools import lru_cache
 
-pyautogui.PAUSE = 0
+pyautogui.PAUSE = 0.001
 
 
 
-compression = 5
+compression = 6
 
-mouse = Controller()
 s = pyautogui.screenshot()
 s = s.crop((0,0,480,1000))
 size = s.size
+
 s = s.load()
 
 colorsCoord = dict()
@@ -86,7 +86,7 @@ def clickColor(x,y):
     pyautogui.click(x,y)
 
 def loadImage():
-    image = Image.open("f.jpg").convert("RGB")
+    image = Image.open("assets/f.jpg").convert("RGB")
     return image
 
 def computeImage(image):
@@ -107,19 +107,20 @@ def draw(pixels):
             actualPixel = tuple(pixels[x,y])
             if(actualPixel != (0,0,0)):
                 if(actualPixel != selectedColor):
+                    time.sleep(0.07)
                     selectColor(actualPixel)
+
                     selectedColor = actualPixel
                 clickMouse(x,y)
         
 def selectColor(color):
     x,y = colorsCoord[color]
-    mouse.position = (x,y)
-    mouse.click(Button.left, 1)
+    pyautogui.click(x,y)
     
     
 def setColorsCoord():
     for x in range(size[0]):
-        for y in range(size[1]):
+        for y in range(150,size[1],1):
             if (s[x,y] in COLORS):
                 colorsCoord[s[x,y]] = x,y
 
@@ -149,7 +150,7 @@ def multiProcess(pixels):
     coresCount = multiprocessing.cpu_count()
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
-    temp = np.split(pixels,coresCount)
+    temp = np.array_split(pixels,coresCount)
    
     processes = []
     for i in range(coresCount):
@@ -168,15 +169,20 @@ def multiProcess(pixels):
 
 if __name__ == '__main__':
     temps = time.time()
+    print("start")
     setColorsCoord()
+    print("Coordonnées des couleurs déectées", time.time()-temps)
     image = loadImage()
+    print("Image chargée", time.time()-temps)
     pixels = computeImage(image)
+    print("Image modifiée", time.time()-temps)
     pixels = multiProcess(pixels)
+    print("Palette de l'image modifiée", time.time()-temps)
     #pixels = updateColors(pixels)
     #Image.fromarray(pixels).show()
     draw(pixels)
+    print("Image dessinée", time.time()-temps)
     
-    print(time.time()-temps)
     
     '''
     OLD WAY

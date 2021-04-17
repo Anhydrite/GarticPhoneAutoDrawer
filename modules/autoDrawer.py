@@ -92,7 +92,7 @@ class AutoDrawer(object):
     
     def check(self):
         if(self.loaded == 1):
-            return ("Prêt", 1)
+            return ("Prêt", 3)
         if(self.loaded == 2):
             return ("En cours", 2)
         if(self.drawAreaConfigured == False):
@@ -173,7 +173,6 @@ class AutoDrawer(object):
     def draw(self):  
         if(self.loaded != 1):
             return
-        self.computeImage()
         i, j, osef = self.image.shape
         previousColor = (-1, -1, -1)    
         for x in range(0,j,self.compression):
@@ -187,26 +186,6 @@ class AutoDrawer(object):
                     self.selectColor(actualColor)
                     self.clickMouse(x,y)
             self.dragMouse(x,i)
-
-
-def betterDraw(pixels):
-    i, j, osef = pixels.shape
-    previousColor = (-1, -1, -1)
-    global compression
-    trace = j-(j%compression)
-
-    for x in range(0,i,compression):
-        clickMouse(x,0)
-        for y in range(0,j,compression):
-            actualColor = tuple(pixels[x,y])
-            if(actualColor != previousColor):
-                previousColor = actualColor
-                dragMouse(x,y-1)              
-                selectColor(actualColor)
-                clickMouse(x,y)
-        dragMouse(x,j)
-    
-
 
 
 @lru_cache()

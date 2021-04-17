@@ -58,8 +58,9 @@ class Window(QMainWindow, Ui_MainWindow):
     def launchComputing(self):
         message = self.drawer.check()
         self.generalStatus.setText(message[0])
-        if(message[1] == 1):
+        if(message[1] != 1):
             return
+        
         self.generalStatus.setText("Image en cours de traitement 1/2")
         message = self.drawer.computeImage()
         self.generalStatus.setText(message[0])   
@@ -72,11 +73,13 @@ class Window(QMainWindow, Ui_MainWindow):
         self.generalStatus.setText(message[0])
         self.generalStatus.setStyleSheet("color: green;")
 
+
     def launchDraw(self):
         message = self.drawer.check()
         self.generalStatus.setText(message[0])
-        if(message[1] != 1):
+        if(message[1] != 3):
             return
+        print("qdsqsd")
         self.drawer.draw()
 
 if __name__ == "__main__":

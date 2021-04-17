@@ -1,247 +1,86 @@
-# -*- coding: utf-8 -*-
-"""
-Spyder Editor
+import sys
 
-xmin = 480
-xmax = 1440
-ymin = 300
-ymax = 800
+from PyQt5.QtWidgets import (
+    QApplication, QDialog, QMainWindow, QMessageBox
+)
+from PyQt5.uic import loadUi
 
-"black" = [0,0,0]
-"dark_grey" = [102,102,10]
-"dark_blue" = [0,80,205]
-"white" = [255,255,255]
-"light_grey" = [170,170,170]
-"light_blue" = [38,201,25]
-"dark_green" = [1,116,32]
-"dark_marron" = [105,21,6]
-"light_marron" = [150, 65, 18]
-"light_green" = [17,176,60]
-"red" = [255,0,19]
-"orange" = [255,120,4]
-"dirt_yellow" = [176,112,2]
-"purple" = [153,0,76]
-"beige" = [203,90,87]
-"yellow" = [255,193,3]
-"light_beige" = [254,175,16]
-"""
-xmin = 550
-xmax = 1440
-ymin = 350
-ymax = 800
-COLORS = [
-(0,80,205),
-(170,170,170),
-(38,201,255),
-(1,116,32),
-(105,21,6),
-(150, 65, 18),
-(17,176,60),
-(255,0,19),
-(255,120,41),
-(176,112,28),
-(153,0,78),
-(203,90,87),
-(255,193,38),
-(255,0,143),
-(254,175,168),
-    ]
-COLORS = set(COLORS)
+from ui.mainWindow import Ui_MainWindow
+from modules.autoDrawer import AutoDrawer
+from modules.detectClicks import detectClick
+import asyncio 
 
 
+class Window(QMainWindow, Ui_MainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setupUi(self)
+        self.setupButtons()
+        self.drawer = AutoDrawer()  
 
-import multiprocessing
-# import the necessary packages
-import numpy as np
+    def setupButtons(self):
+        self.drawSetup.clicked.connect(self.setupDrawArea)
+        self.colorSetup.clicked.connect(self.setupColorArea)
+        self.urlLoad.clicked.connect(self.setupImage)
+        self.exitButton.clicked.connect(self.close)
+        self.drawButton.clicked.connect(self.launchDraw)
+       
+    def setupDrawArea(self):
+        self.drawStatus.setText("Configuration ...")
+        self.drawStatus.setStyleSheet("color: orange;")
+        start, end = detectClick()
+        self.drawer.setupDrawArea(start, end)
+        string = "Zone de dessin configurée x : {x}, y : {y}".format(x=start, y=end)
+        self.drawStatus.setText(string)
+        self.drawStatus.setStyleSheet("color: green;")
+        self.launchComputing()
 
-import time
-from PIL import Image, ImageEnhance, ImageOps
-import numpy as np
-from itertools import chain
-import pyautogui
-from math import sqrt
-from functools import lru_cache
-
-pyautogui.PAUSE = 0.01
-
-
-
-compression = 2
-
-s = pyautogui.screenshot()
-s = s.crop((0,0,460,700))
-size = s.size
-
-s = s.load()
-
-colorsCoord = dict()
-
-def clickMouse(x ,y):
-    x = x+xmin
-    y = y+ymin
-    pyautogui.click(x,y, 1)
-
-def dragMouse(x,y):
-    x = x+xmin
-    y = y+ymin
-    pyautogui.dragTo(x,y, button='left')
-
-def clickColor(x,y):
-    pyautogui.click(x,y)
-
-def loadImage():
-    image = Image.open("assets/d.jpg").convert("RGB")
-    return image
-
-def computeImage(image):
-    size = ( ymax-ymin,xmax-xmin)
-    size = (500, 500)
-    image = image.resize(size)
-    enhancer = ImageEnhance.Contrast(image)
-    image = image.rotate(270)
-    image = ImageOps.mirror(image)
-
-    pixels = np.array(image)
-    return pixels
-
-def draw(pixels):
-    i, j, osef = pixels.shape
-    selectedColor = (1,1,1)
-    global compression
-    for x in range(0,i,compression):
-        for y in range(0,j,compression):
-            actualPixel = tuple(pixels[x,y])
-            if(actualPixel != (0,0,0)):
-                if(actualPixel != selectedColor):
-                    time.sleep(0.07)
-                    selectColor(actualPixel)
-
-                    selectedColor = actualPixel
-                clickMouse(x,y)
+    def setupColorArea(self):
+        self.colorAreaStatus.setText("Configuration ...")
+        self.colorAreaStatus.setStyleSheet("color: orange;")
+        start, end = detectClick()
+        self.drawer.setupColorArea(start,end)
+        string = "Zone des couleurs configurée x : {x}, y : {y} ".format(x=start, y=end)
+        self.colorAreaStatus.setText(string)
+        self.colorAreaStatus.setStyleSheet("color: green;")
+        self.launchComputing()
         
-def selectColor(color):
-    x,y = colorsCoord[color]
-    pyautogui.click(x,y)
-    
-    
-def setColorsCoord():
-    for x in range(size[0]):
-        for y in range(200,size[1],1):
-            if (s[x,y] in COLORS):
-                colorsCoord[s[x,y]] = x,y
-
-@lru_cache()
-def giveClosestColor(rgb):
-    r, g, b = rgb[:3]
-    color_diffs = []
-    for color in COLORS:
-        cr, cg, cb = color
-        color_diff = sqrt(abs(r - cr)**2 + abs(g - cg)**2 + abs(b - cb)**2)
-        color_diffs.append((color_diff, color))
-
-    return min(color_diffs)[1]
-
-def updateColors(pixels, index, return_array):
-    i, j, osef = pixels.shape
-    for x in range(i):
-        for y in range(j):
-            pixels[x,y] = giveClosestColor(tuple(pixels[x,y]))
-
-    return_array[index] = pixels
-
-
-newArray = dict()
-
-def multiProcess(pixels):
-    coresCount = multiprocessing.cpu_count()
-    manager = multiprocessing.Manager()
-    return_dict = manager.dict()
-    temp = np.array_split(pixels,coresCount)
-   
-    processes = []
-    for i in range(coresCount):
-        array = temp[i]
-        p = multiprocessing.Process(target=updateColors, args=(array, i, return_dict))
-        processes.append(p)
-        p.start()
-    
-    for process in processes:
-        process.join();
+    def setupImage(self):
+        url = self.url.text()
+        message = self.drawer.loadImage(url)
+        self.statusLabel.setText(message[0])
+        if(message[1] == 0):
+            self.statusLabel.setStyleSheet("color: red;")
+            return
+        self.statusLabel.setStyleSheet("color: green;")
+        self.launchComputing()
         
-    
-    temp = np.concatenate([v for k,v in sorted(return_dict.items())], 0)
-    return temp
+    def launchComputing(self):
+        message = self.drawer.check()
+        self.generalStatus.setText(message[0])
+        if(message[1] == 1):
+            return
+        self.generalStatus.setText("Image en cours de traitement 1/2")
+        message = self.drawer.computeImage()
+        self.generalStatus.setText(message[0])   
+        if(message[1] == 0):
+            return
+        self.generalStatus.setText(message[0])   
+        message = self.drawer.updateColors()
+        if(message[1] == 0):
+             return
+        self.generalStatus.setText(message[0])
+        self.generalStatus.setStyleSheet("color: green;")
 
-def betterDraw(pixels):
-    i, j, osef = pixels.shape
-    previousColor = (-1, -1, -1)
-    global compression
-    trace = j-(j%compression)
+    def launchDraw(self):
+        message = self.drawer.check()
+        self.generalStatus.setText(message[0])
+        if(message[1] != 1):
+            return
+        self.drawer.draw()
 
-    for x in range(0,i,compression):
-        clickMouse(x,0)
-        for y in range(0,j,compression):
-            actualColor = tuple(pixels[x,y])
-            if(actualColor != previousColor):
-                previousColor = actualColor
-                dragMouse(x,y-1)              
-                selectColor(actualColor)
-                clickMouse(x,y)
-        dragMouse(x,j)
-                
-
-                
-                
-if __name__ == '__main__':
-    temps = time.time()
-    print("start")
-    setColorsCoord()
-    print("Coordonnées des couleurs déectées", time.time()-temps)
-    image = loadImage()
-    print("Image chargée", time.time()-temps)
-    pixels = computeImage(image)
-    print("Image modifiée", time.time()-temps)
-    pixels = multiProcess(pixels)
-    print("Palette de l'image modifiée", time.time()-temps)
-    #pixels = updateColors(pixels)
-    #Image.fromarray(pixels).show()
-    #draw(pixels)
-    betterDraw(pixels)
-    print("Image dessinée", time.time()-temps)
-
-    
-    '''
-    OLD WAY
-    
-def color_difference (color1, color2):
-c    return sum([abs(component1-component2) for component1, component2 in zip(color1, color2)])
-
-
-def giveClosestColor(my_color):
-    differences = [[color_difference(my_color, target_value), target_name] for target_name, target_value in TARGET_COLORS.items()]
-    differences.sort() 
-    my_color_name = differences[0][1]
-    rgb = TARGET_COLORS[my_color_name]
-    return rgb
-c
-COLORS = {
-   "black" : (0,0,0),
-    "dark_grey" : (102,102,102),
-    "dark_blue" : (0,80,205),
-    "white" : (255,255,255),
-    "light_grey" : (170,170,170),
-    "light_blue" : (38,201,255),
-    "dark_green" : (1,116,32),
-    "dark_marron" : (105,21,6),
-    "light_marron" : (150, 65, 18),
-    "light_green" : (17,176,60),
-    "red" : (255,0,19),
-    "orange" : (255,120,41),
-    "dirt_yellow" : (176,112,28),
-    "purple" : (153,0,78),
-    "beige" : (203,90,87),
-    "yellow" : (205,193,38),
-    "pink" : (255,0,143),
-    "light_beige" : (254,175,168),
-    }
-'''
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    win = Window()    
+    win.show()
+    sys.exit(app.exec())

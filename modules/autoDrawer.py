@@ -73,7 +73,7 @@ class AutoDrawer(object):
         self.imageConfigured = False
         self.colorsCoord = dict()
         self.loaded = 0
-        self.compression = 10
+        self.compression = 2
         
     def setupDrawArea(self, start, end):
         self.drawStart = start
@@ -127,6 +127,7 @@ class AutoDrawer(object):
         try:
             image = requests.get(url, stream=True).raw
             image = Image.open(image)
+
         except: 
             return ("Url non valide", 0)     
         
@@ -141,14 +142,10 @@ class AutoDrawer(object):
             self.loaded = 2
             x = self.drawEnd[0] - self.drawStart[0]
             y = self.drawEnd[1] - self.drawStart[1]
-            print(x,y)
-            print(self.drawEnd, self.drawStart)
             image = self.image.convert("RGB")
             enhancer = ImageEnhance.Contrast(image)
-
             image = ImageOps.mirror(image)
             image = image.resize((x,y))
-
             self.image = np.array(image)
         except:
             self.loaded = 0
@@ -169,24 +166,32 @@ class AutoDrawer(object):
         x,y = self.colorsCoord[color]
         pyautogui.click(x,y)
 
-
-    def draw(self):  
+    def newDraw(self):
         if(self.loaded != 1):
             return
-        i, j, osef = self.image.shape
-        previousColor = (-1, -1, -1)    
-        for x in range(0,j,self.compression):
-            self.clickMouse(x,0)
-            print(x)
-            for y in range(0,i,self.compression):
-                actualColor = tuple(self.image[y,x])
-                if(actualColor != previousColor):
-                    previousColor = actualColor
-                    self.dragMouse(x,y-1)              
-                    self.selectColor(actualColor)
-                    self.clickMouse(x,y)
-            self.dragMouse(x,i)
+        previousColor = (-1, -1, -1)
+        colors = np.unique(self.image.reshape(-1, self.image.shape[2]), axis=0)
+        j, i, osef = self.image.shape
 
+        for color in colors:
+            color = tuple(color)
+            self.selectColor(color)
+            for x in range(0, j, self.compression):
+                if(previousColor == color):
+                    self.clickMouse(x, 0)
+                for y in range(0, i, self.compression):
+                    try:
+                        actualColor = tuple(self.image[x,y])
+                    except:
+                        print(x, j, y, i, self.image.shape)
+                    if(actualColor != previousColor):
+                        if(previousColor == color):
+                            self.dragMouse(x, y - self.compression)
+                        if(actualColor == color):
+                            self.clickMouse(x, y )
+                        previousColor = actualColor
+                if(previousColor == color):
+                    self.dragMouse(x, i)
 
 @lru_cache()
 def giveClosestColor(rgb):
@@ -231,5 +236,12 @@ def multiProcess(pixels):
     return temp
 
                 
-
-                
+if __name__ == "__main__":
+    drawer = AutoDrawer()
+    url = "https://cdn.futura-sciences.com/buildsv6/images/largeoriginal/f/d/9/fd934cf78c_50013319_terre-02.jpg"
+    drawer.loadImage(url)
+    drawer.setupDrawArea((4347,348), (4802,807))
+    drawer.setupColorArea((4118,386), (4289, 691))
+    drawer.computeImage()
+    drawer.updateColors()
+    drawer.newDraw()

@@ -80,7 +80,7 @@ class Window(QMainWindow, Ui_MainWindow):
         if(message[1] != 3):
             return
         print("qdsqsd")
-        self.drawer.draw()
+        self.drawer.newDraw()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

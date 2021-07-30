@@ -4,4 +4,4 @@
 pip install -r requirements.txt
 ```
 
-## Si t'as conda, demerde toi
+## Si t'as conda, euh bonne chance
